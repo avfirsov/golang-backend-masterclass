@@ -25,7 +25,7 @@ func RandomCurrency() string {
 }
 
 func RandomMoney() int64 {
-	return rand.Int63n(1_000_000) + 1
+	return rand.Int63n(1_000_000) + 100 //min 100 - for tests
 }
 
 func RandomAmount() int64 {
