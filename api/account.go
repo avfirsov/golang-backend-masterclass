@@ -59,7 +59,7 @@ func (server *Server) getAccount(ctx *gin.Context) {
 		return
 	}
 
-	account, err := server.store.GetAccountForUpdate(ctx, req.ID)
+	account, err := server.store.GetAccount(ctx, req.ID)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			ctx.JSON(http.StatusNotFound, errorResponse(err))

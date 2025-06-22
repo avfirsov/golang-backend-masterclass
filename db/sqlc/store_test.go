@@ -105,11 +105,11 @@ func TestTransferTx(t *testing.T) {
 	}
 
 	//check updated account's balances
-	updatedFromAccount, err := store.GetAccountForUpdate(context.Background(), fromAccount.ID)
+	updatedFromAccount, err := store.GetAccount(context.Background(), fromAccount.ID)
 	require.NoError(t, err)
 	require.Equal(t, fromAccount.Balance-int64(n)*amount, updatedFromAccount.Balance)
 
-	updatedToAccount, err := store.GetAccountForUpdate(context.Background(), toAccount.ID)
+	updatedToAccount, err := store.GetAccount(context.Background(), toAccount.ID)
 	require.NoError(t, err)
 
 	fmt.Println(">> after:", updatedFromAccount.Balance, updatedToAccount.Balance)
@@ -151,11 +151,11 @@ func TestTransferTxDeadlock(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	updatedAcc1, err := store.GetAccountForUpdate(context.Background(), acc1.ID)
+	updatedAcc1, err := store.GetAccount(context.Background(), acc1.ID)
 	require.NoError(t, err)
 	require.Equal(t, acc1.Balance, updatedAcc1.Balance)
 
-	updatedAcc2, err := store.GetAccountForUpdate(context.Background(), acc2.ID)
+	updatedAcc2, err := store.GetAccount(context.Background(), acc2.ID)
 	require.NoError(t, err)
 	require.Equal(t, acc2.Balance, updatedAcc2.Balance)
 }

@@ -8,29 +8,9 @@ import (
 )
 
 type Store interface {
-	// Account methods
-	CreateAccount(ctx context.Context, arg CreateAccountParams) (Account, error)
-	DeleteAccount(ctx context.Context, id int64) error
-	GetAccountForUpdate(ctx context.Context, id int64) (Account, error)
-	ListAccounts(ctx context.Context, arg ListAccountsParams) ([]Account, error)
-	UpdateAccount(ctx context.Context, arg UpdateAccountParams) (Account, error)
-
-	// Entry methods
-	CreateEntry(ctx context.Context, arg CreateEntryParams) (Entry, error)
-	DeleteEntry(ctx context.Context, id int64) error
-	GetEntry(ctx context.Context, id int64) (Entry, error)
-	ListEntries(ctx context.Context, arg ListEntriesParams) ([]Entry, error)
-	ListEntriesByAccount(ctx context.Context, accountID int64) ([]Entry, error)
-	UpdateEntry(ctx context.Context, arg UpdateEntryParams) (Entry, error)
-
-	// Transfer methods
-	CreateTransfer(ctx context.Context, arg CreateTransferParams) (Transfer, error)
-	DeleteTransfer(ctx context.Context, id int64) error
-	GetTransfer(ctx context.Context, id int64) (Transfer, error)
-	ListTransfers(ctx context.Context, arg ListTransfersParams) ([]Transfer, error)
-	ListTransfersBetweenAccounts(ctx context.Context, arg ListTransfersBetweenAccountsParams) ([]Transfer, error)
-	ListTransfersByAccount(ctx context.Context, fromAccountID int64) ([]Transfer, error)
-	UpdateTransferAmount(ctx context.Context, arg UpdateTransferAmountParams) error
+	Querier
+	//TXs
+	TransferTx(ctx context.Context, arg TransferTxParams) (TransferTxResult, error)
 }
 
 // SQLStore provides all functions to execute SQL queries and transactions
@@ -42,7 +22,7 @@ type SQLStore struct {
 var _ Store = (*SQLStore)(nil)
 
 // NewStore creates a new store
-func NewStore(connPool *pgxpool.Pool) *SQLStore {
+func NewStore(connPool *pgxpool.Pool) Store {
 	return &SQLStore{
 		connPool: connPool,
 		Queries:  New(connPool),
@@ -116,7 +96,7 @@ func (store *SQLStore) TransferTx(ctx context.Context, arg TransferTxParams) (Tr
 			return err
 		}
 
-		if (arg.FromAccountID < arg.ToAccountID) {
+		if arg.FromAccountID < arg.ToAccountID {
 			result.FromAccount, result.ToAccount, err = addSubstractMoney(ctx, q, arg.FromAccountID, arg.ToAccountID, arg.Amount)
 		} else {
 			result.ToAccount, result.FromAccount, err = addSubstractMoney(ctx, q, arg.ToAccountID, arg.FromAccountID, -arg.Amount)
