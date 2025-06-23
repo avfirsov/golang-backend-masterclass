@@ -20,7 +20,7 @@ func RandomOwner() string {
 }
 
 func RandomCurrency() string {
-	currencies := []string{"USD", "EUR", "RUB", "CAD"}
+	currencies := []string{USD, EUR, RUB, CAD}
 	return currencies[rand.Intn(len(currencies))]
 }
 
@@ -37,6 +37,14 @@ func fakeTimestamp() pgtype.Timestamptz {
 		Time:  time.Now().Add(-time.Duration(rand.Int63n(int64(365*24*time.Hour.Seconds()))) * time.Second),
 		Valid: true,
 	}
+}
+
+// RandomInt возвращает случайное целое число в диапазоне [min, max]
+func RandomInt(min, max int) int {
+	if max <= min {
+		return min
+	}
+	return rand.Intn(max-min+1) + min
 }
 
 //// --- Фейковые генераторы ---
