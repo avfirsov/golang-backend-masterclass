@@ -25,10 +25,37 @@ type transferTestCase struct {
 }
 
 func TestCreateTransferAPI(t *testing.T) {
-	fromAccount := randAccount()
-	toAccount := randAccount()
-	currency := fromAccount.Currency
-	amount := util.RandomMoney()
+	currency := util.RandomCurrency()
+	otherCurrency := util.RandomCurrency()
+	for otherCurrency == currency {
+		if otherCurrency != currency {
+			break
+		}
+		otherCurrency = util.RandomCurrency()
+	}
+	fromAccount := randAccount(currency)
+	toAccount := randAccount(currency)
+	toAccountWithOtherCurrency := randAccount(otherCurrency)
+	for {
+		if toAccount.ID != fromAccount.ID {
+			break
+		}
+		toAccount = randAccount(currency)
+	}
+	for {
+		if toAccountWithOtherCurrency.ID != fromAccount.ID {
+			break
+		}
+		toAccountWithOtherCurrency = randAccount(otherCurrency)
+	}
+	amount := int64(util.RandomInt(1, 10))
+	expectedResult := db.TransferTxResult{
+		Transfer:    db.Transfer{ID: 1, FromAccountID: fromAccount.ID, ToAccountID: toAccount.ID, Amount: amount},
+		FromAccount: fromAccount,
+		ToAccount:   toAccount,
+		FromEntry:   db.Entry{ID: 1, AccountID: fromAccount.ID, Amount: -amount},
+		ToEntry:     db.Entry{ID: 2, AccountID: toAccount.ID, Amount: amount},
+	}
 
 	testCases := []transferTestCase{
 		{
@@ -42,10 +69,10 @@ func TestCreateTransferAPI(t *testing.T) {
 			buildStubs: func(store *mockdb.MockStore) {
 				store.EXPECT().GetAccount(gomock.Any(), fromAccount.ID).Times(1).Return(fromAccount, nil)
 				store.EXPECT().GetAccount(gomock.Any(), toAccount.ID).Times(1).Return(toAccount, nil)
-				store.EXPECT().TransferTx(gomock.Any(), gomock.Any()).Times(1).Return(db.TransferTxResult{}, nil)
+				store.EXPECT().TransferTx(gomock.Any(), gomock.Any()).Times(1).Return(expectedResult, nil)
 			},
 			checkResponse: func(recorder *httptest.ResponseRecorder) {
-				require.Equal(t, http.StatusOK, recorder.Code)
+				requireBodyMatchTransfer(t, recorder, expectedResult, http.StatusOK)
 			},
 		},
 		{
@@ -60,7 +87,7 @@ func TestCreateTransferAPI(t *testing.T) {
 				store.EXPECT().GetAccount(gomock.Any(), int64(9999)).Times(1).Return(db.Account{}, pgx.ErrNoRows)
 			},
 			checkResponse: func(recorder *httptest.ResponseRecorder) {
-				require.Equal(t, http.StatusNotFound, recorder.Code)
+				requireBodyMatchTransfer(t, recorder, db.TransferTxResult{}, http.StatusNotFound)
 			},
 		},
 		{
@@ -76,22 +103,38 @@ func TestCreateTransferAPI(t *testing.T) {
 				store.EXPECT().GetAccount(gomock.Any(), int64(9999)).Times(1).Return(db.Account{}, pgx.ErrNoRows)
 			},
 			checkResponse: func(recorder *httptest.ResponseRecorder) {
-				require.Equal(t, http.StatusNotFound, recorder.Code)
+				requireBodyMatchTransfer(t, recorder, db.TransferTxResult{}, http.StatusNotFound)
 			},
 		},
 		{
-			name: "CurrencyMismatch",
+			name: "CurrencyMismatchWithToAccount",
+			body: gin.H{
+				"from_account_id": fromAccount.ID,
+				"to_account_id":   toAccountWithOtherCurrency.ID,
+				"amount":          amount,
+				"currency":        currency,
+			},
+			buildStubs: func(store *mockdb.MockStore) {
+				store.EXPECT().GetAccount(gomock.Any(), fromAccount.ID).Times(1).Return(fromAccount, nil)
+				store.EXPECT().GetAccount(gomock.Any(), toAccountWithOtherCurrency.ID).Times(1).Return(toAccountWithOtherCurrency, nil)
+			},
+			checkResponse: func(recorder *httptest.ResponseRecorder) {
+				requireBodyMatchTransfer(t, recorder, db.TransferTxResult{}, http.StatusBadRequest)
+			},
+		},
+		{
+			name: "CurrencyMismatchWithFromAccount",
 			body: gin.H{
 				"from_account_id": fromAccount.ID,
 				"to_account_id":   toAccount.ID,
 				"amount":          amount,
-				"currency":        "EUR",
+				"currency":        otherCurrency,
 			},
 			buildStubs: func(store *mockdb.MockStore) {
 				store.EXPECT().GetAccount(gomock.Any(), fromAccount.ID).Times(1).Return(fromAccount, nil)
 			},
 			checkResponse: func(recorder *httptest.ResponseRecorder) {
-				require.Equal(t, http.StatusBadRequest, recorder.Code)
+				requireBodyMatchTransfer(t, recorder, db.TransferTxResult{}, http.StatusBadRequest)
 			},
 		},
 		{
@@ -106,7 +149,7 @@ func TestCreateTransferAPI(t *testing.T) {
 				store.EXPECT().GetAccount(gomock.Any(), fromAccount.ID).Times(1).Return(fromAccount, nil)
 			},
 			checkResponse: func(recorder *httptest.ResponseRecorder) {
-				require.Equal(t, http.StatusBadRequest, recorder.Code)
+				requireBodyMatchTransfer(t, recorder, db.TransferTxResult{}, http.StatusBadRequest)
 			},
 		},
 		{
@@ -119,7 +162,7 @@ func TestCreateTransferAPI(t *testing.T) {
 			},
 			buildStubs: func(store *mockdb.MockStore) {},
 			checkResponse: func(recorder *httptest.ResponseRecorder) {
-				require.Equal(t, http.StatusBadRequest, recorder.Code)
+				requireBodyMatchTransfer(t, recorder, db.TransferTxResult{}, http.StatusBadRequest)
 			},
 		},
 		{
@@ -136,7 +179,7 @@ func TestCreateTransferAPI(t *testing.T) {
 				store.EXPECT().TransferTx(gomock.Any(), gomock.Any()).Times(1).Return(db.TransferTxResult{}, pgx.ErrTxClosed)
 			},
 			checkResponse: func(recorder *httptest.ResponseRecorder) {
-				require.Equal(t, http.StatusInternalServerError, recorder.Code)
+				requireBodyMatchTransfer(t, recorder, db.TransferTxResult{}, http.StatusInternalServerError)
 			},
 		},
 	}
@@ -166,25 +209,13 @@ func TestCreateTransferAPI(t *testing.T) {
 	}
 }
 
-// randAccount и requireBodyMatchTransfer можно доработать при необходимости
-type ginH map[string]interface{}
 
-func randTransfer() db.Transfer {
-	return db.Transfer{
-		ID:       int64(util.RandomInt(1, 100)),
-		FromAccountID:    int64(util.RandomInt(1, 100)),
-		ToAccountID:  int64(util.RandomInt(1, 100)),
-		Amount: util.RandomMoney(),
-	}
-}
-
-// Можно реализовать requireBodyMatchTransfer для глубокого сравнения результата, если нужно
-func requireBodyMatchTransfer(t *testing.T, recorder *httptest.ResponseRecorder, result db.TransferTxResult) {
+func requireBodyMatchTransfer(t *testing.T, recorder *httptest.ResponseRecorder, result db.TransferTxResult, expectedCode int) {
 	data, err := io.ReadAll(recorder.Body)
 	require.NoError(t, err)
 
 	var gotResult db.TransferTxResult
 	require.NoError(t, json.Unmarshal(data, &gotResult))
-	require.Equal(t, http.StatusOK, recorder.Code)
+	require.Equal(t, expectedCode, recorder.Code)
 	require.Equal(t, result, gotResult)
 }

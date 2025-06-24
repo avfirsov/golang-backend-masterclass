@@ -26,6 +26,7 @@ func (server *Server) createTransfer(ctx *gin.Context) {
 	}
 
 	if err := server.validAccountFrom(req.FromAccountID, req.Currency, req.Amount); err != nil {
+		fmt.Println("validAccountFrom error", err)
 		if errors.Is(err, pgx.ErrNoRows) {
 			ctx.JSON(http.StatusNotFound, errorResponse(err))
 		} else {
@@ -35,6 +36,7 @@ func (server *Server) createTransfer(ctx *gin.Context) {
 	}
 
 	if err := server.validAccountTo(req.ToAccountID, req.Currency); err != nil {
+		fmt.Println("validAccountTo error", err)
 		if errors.Is(err, pgx.ErrNoRows) {
 			ctx.JSON(http.StatusNotFound, errorResponse(err))
 		} else {
@@ -51,6 +53,7 @@ func (server *Server) createTransfer(ctx *gin.Context) {
 
 	result, err := server.store.TransferTx(ctx, arg)
 	if err != nil {
+		fmt.Println("TransferTx error", err)
 		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
 		return
 	}

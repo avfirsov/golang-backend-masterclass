@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/rand"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -17,7 +18,8 @@ import (
 )
 
 func TestGetAccountAPI(t *testing.T) {
-	account := randAccount()
+	currency := util.RandomCurrency()
+	account := randAccount(currency)
 
 	testCases := []struct {
 		name          string
@@ -86,12 +88,12 @@ func TestGetAccountAPI(t *testing.T) {
 	}
 }
 
-func randAccount() db.Account {
+func randAccount(currency string) db.Account {
 	return db.Account{
 		ID:       int64(util.RandomInt(1, 100)),
 		Owner:    util.RandomOwner(),
-		Balance:  util.RandomMoney(),
-		Currency: util.RandomCurrency(),
+		Balance:  rand.Int63n(100) + 10,
+		Currency: currency,
 	}
 }
 
