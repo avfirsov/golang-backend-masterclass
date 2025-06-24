@@ -73,8 +73,8 @@ func (server *Server) getAccount(ctx *gin.Context) {
 }
 
 type ListAccountsRequest struct {
-	Limit  int32 `form:"limit" binding:"required,min=5,max=10"`
-	Offset int32 `form:"offset" binding:"required,min=0"`
+	Limit int32 `form:"limit" binding:"required,min=5,max=10"`
+	Page  int32 `form:"page" binding:"required,min=1"`
 }
 
 func (server *Server) listAccounts(ctx *gin.Context) {
@@ -86,7 +86,7 @@ func (server *Server) listAccounts(ctx *gin.Context) {
 
 	accounts, err := server.store.ListAccounts(ctx, db.ListAccountsParams{
 		Limit:  req.Limit,
-		Offset: req.Offset,
+		Offset: (req.Page - 1) * req.Limit,
 	})
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
